@@ -41,6 +41,7 @@ from prediction_agent_v2 import PredictionAgent
 import asyncio
 
 async def run_agent():
+    # 使用 sure.im 前需通过其官网注册账户：https://www.sure.im/
     agent = PredictionAgent("prediction_agent@sure.im", "123456")
     await agent.start()
     await asyncio.sleep(5)  # 保持连接5秒

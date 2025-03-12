@@ -151,6 +151,7 @@ class PredictionAgent(Agent):
                         print(f"Data update error: {str(e)}")
 
 async def run_agent():
+    # 使用 sure.im 前需通过其官网注册账户：https://www.sure.im/
     agent = PredictionAgent("prediction_agent@sure.im", "123456")
     await agent.start()  # 关键：使用await
     
