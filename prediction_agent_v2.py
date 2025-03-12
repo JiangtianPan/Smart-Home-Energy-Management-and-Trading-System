@@ -92,6 +92,7 @@ class PredictionAgent(Agent):
     # 行为2：周期预测
     class PredictionBehaviour(PeriodicBehaviour):
         async def run(self):
+            print("[DEBUG] 预测行为被触发")  # 添加调试语句
             if self.agent.latest_data is not None:
                 try:
                     # 打印原始输入数据
@@ -149,20 +150,34 @@ class PredictionAgent(Agent):
                     except Exception as e:
                         print(f"Data update error: {str(e)}")
 
-if __name__ == "__main__":
-    agent = PredictionAgent(
-        "prediction_agent@your_xmpp_server",
-        "password"
-    )
-    agent.start()
+async def run_agent():
+    agent = PredictionAgent("prediction_agent@sure.im", "123456")
+    await agent.start()  # 关键：使用await
     
     # 保持Agent运行
-    import time
     try:
         while True:
-            time.sleep(1)
+            await asyncio.sleep(1)
     except KeyboardInterrupt:
-        agent.stop()
+        await agent.stop()
+
+# if __name__ == "__main__":
+#     agent = PredictionAgent(
+#         "prediction_agent@your_xmpp_server",
+#         "password"
+#     )
+#     agent.start()
+    
+#     # 保持Agent运行
+#     import time
+#     try:
+#         while True:
+#             time.sleep(1)
+#     except KeyboardInterrupt:
+#         agent.stop()
+
+if __name__ == "__main__":
+    asyncio.run(run_agent())  # 通过事件循环启动
 
 # // 发送给协商Agent的预测消息
 # {
