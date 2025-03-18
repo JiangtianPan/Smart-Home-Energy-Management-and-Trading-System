@@ -67,9 +67,9 @@ class LSTMModel(nn.Module):
         
     def forward(self, x):
         # LSTM层
-        # print('LSTM 0:', x.size(), x)
+        # print('LSTM 0:', x.size(), x) # [64, 24, 7]
         out, (h_n, c_n) = self.lstm(x)
-        # print('LSTM 1:', out.size(), out)
+        # print('LSTM 1:', out.size(), out) # [64, 24, 64]
         # 取最后一个时间步的输出
         out = out[:, -1, :]  
         # print('LSTM 2:', out.size(), out)
@@ -322,10 +322,12 @@ class PowerPredictor:
         self.load_data()
         self.prepare_data()
         self.build_model()
-        self.train(epochs=100)
+        self.train(epochs=1)
         
         # 预测并可视化
         last_data = self.scaled_data[-self.lookback:]
+        print(last_data.shape) # (24, 7)
+        ddd
         prediction = self.predict(last_data)
         self.visualize(prediction)
 
