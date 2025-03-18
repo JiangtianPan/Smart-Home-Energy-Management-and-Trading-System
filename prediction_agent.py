@@ -1,106 +1,45 @@
+from spade.agent import Agent
+from spade.behaviour import PeriodicBehaviour, CyclicBehaviour
+from spade.message import Message
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import Dataset, DataLoader
-import pandas as pd
+from torch.utils.data import DataLoader
 import numpy as np
+import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-import matplotlib.pyplot as plt
+import json
+import asyncio
+import random
 
+from predictor import LSTMModel
 
-class PowerDataset(Dataset):
-    """自定义时间序列数据集"""
-    def __init__(self, data, lookback, forecast_steps):
-        self.X, self.y = [], []
-        for i in range(len(data)-lookback-forecast_steps):
-            self.X.append(data[i:(i+lookback)])
-            self.y.append(data[i+lookback : i+lookback+forecast_steps, 0])
-        
-    def __len__(self):
-        return len(self.X)
-    
-    def __getitem__(self, idx):
-        return torch.tensor(self.X[idx], dtype=torch.float), \
-               torch.tensor(self.y[idx], dtype=torch.float)
+# 配置日志
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("PredictionAgent")
 
-
-class LSTMModel(nn.Module):
-    """LSTM预测模型"""
-    def __init__(self, input_size, hidden_size, output_steps, num_layers=2, dropout=0.1):
-        super().__init__()
-        self.lstm = nn.LSTM(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            dropout=dropout if num_layers>1 else 0
-        )
-        # 添加层标准化
-        self.ln1 = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(dropout)
-        # 修改初始化方式
-        self.linear = nn.Linear(hidden_size, output_steps)
-        self._init_weights()
-
-    # def _init_weights(self):
-    #     """权重初始化"""
-    #     for name, param in self.lstm.named_parameters():
-    #         if 'weight_ih' in name:
-    #             nn.init.xavier_normal_(param.data)
-    #         elif 'weight_hh' in name:
-    #             nn.init.orthogonal_(param.data)
-    #         elif 'bias' in name:
-    #             param.data.fill_(0)
-                
-    #     nn.init.kaiming_normal_(self.linear.weight)
-
-    def _init_weights(self):
-        """改进的权重初始化"""
-        for name, param in self.lstm.named_parameters():
-            if 'weight_ih' in name:
-                nn.init.kaiming_normal_(param.data)
-            elif 'weight_hh' in name:
-                nn.init.orthogonal_(param.data)
-            elif 'bias' in name:
-                nn.init.constant_(param.data, 0)
-        nn.init.xavier_normal_(self.linear.weight)
-        
-    def forward(self, x):
-        # LSTM层
-        # print('LSTM 0:', x.size(), x) # [64, 24, 7]
-        out, (h_n, c_n) = self.lstm(x)
-        # print('LSTM 1:', out.size(), out) # [64, 24, 64]
-        # 取最后一个时间步的输出
-        out = out[:, -1, :]  
-        # print('LSTM 2:', out.size(), out)
-        out = self.ln1(out)
-        # Dropout
-        out = self.dropout(out)
-        # print('LSTM 3:', out.size(), out)
-        # 全连接层
-        out = self.linear(out)
-        # print('LSTM 4:', out.size(), out)
-        return out
-
-
+# 继承原有预测类（仅保留预测相关部分）
 class PowerPredictor:
-    def __init__(self, file_path):
-        self.eps = 1e-8
-        self.file_path = file_path
-        self.scaler = MinMaxScaler(feature_range=(0, 1))
-        self.model = None
-        self.lookback = 24    # 时间窗口
-        self.forecast_steps = 6  # 预测步长
+    def __init__(self, model_path='best_model.pth'):
+        # input_size = self.scaled_data.shape[1]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = LSTMModel(
+            input_size=7,
+            hidden_size=64,
+            output_steps=6,
+            num_layers=1,  # 单层LSTM
+            dropout=0.3  # 更高的dropout比例
+        ).to(self.device)
+        # self.model = torch.load(model_path, map_location='cpu')
+        self.model.load_state_dict(torch.load('best_model.pth'))
+        self.model.eval()
+        self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.lookback = 24  # 与训练时一致的窗口大小
+        
 
-        self.best_val_loss = float('inf')
-        self.early_stop_patience = 5
-        self.no_improve_count = 0
-
-    def load_data(self):
+    def load_data(self, data_path='./household_power_consumption.csv'):
         """加载并预处理数据"""
         # df = pd.read_csv(self.file_path, parse_dates={'datetime': ['Date', 'Time']})
-        df=pd.read_csv('./household_power_consumption.csv')
+        df=pd.read_csv(data_path)
         df=df.drop('index',axis=1)
         df['Date']=pd.to_datetime(df['Date'])
         df['Time']=pd.to_datetime(df['Time'])
@@ -147,190 +86,159 @@ class PowerPredictor:
         assert not np.isnan(self.scaled_data).any(), "存在NaN值"
         assert not np.isinf(self.scaled_data).any(), "存在无穷值"
 
-    # def load_data(self):
-    #     """数据加载与预处理"""
-    #     df = pd.read_csv(self.file_path, parse_dates={'datetime': ['Date', 'Time']})
-    #     df.set_index('datetime', inplace=True)
-        
-    #     features = ['Global_active_power', 'Global_reactive_power', 'Voltage',
-    #                'Global_intensity', 'Sub_metering_1', 'Sub_metering_2', 'Sub_metering_3']
-    #     self.df = df[features]
-        
-    #     # 处理缺失值
-    #     self.df.replace(0, np.nan, inplace=True)
-    #     self.df.ffill(inplace=True)
-        
-    #     # 标准化
-    #     self.scaled_data = self.scaler.fit_transform(self.df)
+        data_length = len(self.scaled_data)
 
-    # def prepare_data(self, test_size=0.2):
-    #     """准备数据集"""
-    #     train_size = int(len(self.scaled_data) * (1-test_size))
-    #     train_data = self.scaled_data[:train_size]
-    #     test_data = self.scaled_data[train_size:]
+        start = random.randint(0, data_length)
         
-    #     self.train_dataset = PowerDataset(train_data, self.lookback, self.forecast_steps)
-    #     self.test_dataset = PowerDataset(test_data, self.lookback, self.forecast_steps)
-        
-    #     self.train_loader = DataLoader(
-    #         self.train_dataset, 
-    #         batch_size=32, 
-    #         shuffle=True
-    #     )
-    #     self.test_loader = DataLoader(
-    #         self.test_dataset, 
-    #         batch_size=32, 
-    #         shuffle=False
-    #     )
+        scaled_data = self.scaled_data[start:start+self.lookback]
+        return scaled_data
 
-    def prepare_data(self, test_size=0.2):
-        """改进的数据划分方法"""
-        # 时间序列数据必须按时间顺序划分
-        train_size = int(len(self.scaled_data) * (1-test_size))
-        train_data = self.scaled_data[:train_size]
-        test_data = self.scaled_data[train_size-self.lookback:]  # 保持时间连续性
-        
-        # 数据增强：添加随机噪声
-        noise = np.random.normal(0, 1e-3, train_data.shape)
-        train_data = np.clip(train_data + noise, 0, 1)
-        
-        self.train_dataset = PowerDataset(train_data, self.lookback, self.forecast_steps)
-        self.test_dataset = PowerDataset(test_data, self.lookback, self.forecast_steps)
-        
-        # 调整batch_size
-        self.train_loader = DataLoader(self.train_dataset, batch_size=64, shuffle=True)
-        self.test_loader = DataLoader(self.test_dataset, batch_size=64, shuffle=False)
-
-    def build_model(self, hidden_size=64):
-        """构建模型"""
-        input_size = self.scaled_data.shape[1]
-        self.model = LSTMModel(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            output_steps=self.forecast_steps,
-            num_layers=1,  # 单层LSTM
-            dropout=0.3  # 更高的dropout比例
-        ).to(self.device)
-
-    def train(self, epochs=50):
-        """训练模型"""
-        criterion = nn.MSELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=1e-3, weight_decay=1e-4)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=3)
-        train_losses, val_losses = [], []
-        
-        for epoch in range(epochs):
-            # 训练阶段
-            self.model.train()
-            epoch_train_loss = 0
-            iteration = 0
-            for X_batch, y_batch in self.train_loader:
-                X_batch = X_batch.to(self.device)
-                y_batch = y_batch.to(self.device)
-                
-                optimizer.zero_grad()
-                outputs = self.model(X_batch)
-                # print(X_batch, outputs, y_batch)
-                # loss = criterion(outputs, y_batch) + self.eps
-                loss = criterion(outputs, y_batch)*1000
-                # print(epoch, iteration, loss)
-                loss.backward()
-                # 梯度裁剪
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
-                optimizer.step()
-                iteration += 1
-                
-                epoch_train_loss += loss.item()
-            train_loss = epoch_train_loss/len(self.train_loader)
-            # print(epoch, train_loss)
-            if epoch >= 1:
-                train_losses.append(train_loss)
-            
-            # 验证阶段
-            self.model.eval()
-            epoch_val_loss = 0
-            with torch.no_grad():
-                for X_val, y_val in self.test_loader:
-                    X_val = X_val.to(self.device)
-                    y_val = y_val.to(self.device)
-                    
-                    outputs = self.model(X_val)
-                    loss = criterion(outputs, y_val)
-                    epoch_val_loss += loss.item()
-            val_loss = epoch_val_loss/len(self.test_loader)*1000
-
-            if epoch >= 1:
-                val_losses.append(val_loss)
-            
-            print(f"Epoch {epoch+1}/{epochs} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f}")
-            
-            # Early stopping
-            # if epoch > 10 and val_loss > np.mean(val_losses[-5:]):
-            #     print("Early stopping triggered")
-            #     break
-            
-            # 改进的早停机制
-            # if val_loss < self.best_val_loss:
-            #     self.best_val_loss = val_loss
-            #     self.no_improve_count = 0
-            #     torch.save(self.model.state_dict(), 'best_model.pth')  # 保存最佳模型
-            # else:
-            #     self.no_improve_count += 1
-                
-            # if self.no_improve_count >= self.early_stop_patience:
-            #     print(f"Early stopping at epoch {epoch+1}")
-            #     self.model.load_state_dict(torch.load('best_model.pth'))  # 加载最佳模型
-            #     break
-            
-            scheduler.step(val_loss)  # 更新学习率
-                
-        # 绘制损失曲线
-        plt.plot(train_losses, label='Train Loss')
-        plt.plot(val_losses, label='Validation Loss')
-        plt.legend()
-        plt.show()
-        
-    def predict(self, input_data=None):
+    def predict(self, input_data):
         """执行预测"""
-        if input_data is None:
-            input_data = self.scaled_data[-self.lookback:]
-            
-        self.model.eval()
         with torch.no_grad():
             input_tensor = torch.tensor(input_data, dtype=torch.float)\
                 .unsqueeze(0).to(self.device)
             prediction = self.model(input_tensor).cpu().numpy()
-            
+        
         # 逆标准化
-        dummy = np.zeros((prediction.shape[1], self.scaled_data.shape[1]))
-        dummy[:, 0] = prediction[0]
-        predicted_power = self.scaler.inverse_transform(dummy)[:, 0]
-        return predicted_power
+        dummy = np.zeros((prediction.shape[1], 7))  # 7个特征
+        dummy[:, 0] = prediction[0]  # 假设预测第一个特征（Global_active_power）
+        return self.scaler.inverse_transform(dummy)[:, 0]
+
+# SPADE Agent 实现
+class PredictionAgent(Agent):
+    def __init__(self, jid: str, password: str):
+        super().__init__(jid, password)
+        self.predictor = PowerPredictor(model_path="best_model.pth")
+        self.latest_data = None
+        self.current_prediction = None
+
+    async def setup(self):
+        # 注册核心行为
+        self.add_behaviour(self.DataFetchBehaviour(period=1))   # 5分钟获取数据
+        self.add_behaviour(self.PredictionBehaviour(period=12)) # 每小时预测
+        self.add_behaviour(self.MessageHandlerBehaviour())       # 处理请求
+
+    # 行为1：模拟数据获取
+    class DataFetchBehaviour(PeriodicBehaviour):
+        async def run(self):
+            """模拟实时数据获取（实际应替换为真实数据源）"""
+            try:
+                # 示例：生成随机数据（保留特征结构）
+                # new_data = pd.DataFrame({
+                #     'Global_active_power': np.random.uniform(0.1, 5.0, 60),
+                #     'Global_reactive_power': np.random.uniform(0.0, 0.5, 60),
+                #     'Voltage': np.random.normal(240, 2, 60),
+                #     # ... 其他特征 ...
+                # })
+                new_data = self.agent.predictor.load_data(data_path='household_power_consumption.csv')
+                self.agent.latest_data = new_data
+                print(f"[Prediction] Fetched {len(new_data)} new samples")
+            except Exception as e:
+                print(f"Data fetch error: {str(e)}")
+
+    # 行为2：周期预测
+    class PredictionBehaviour(PeriodicBehaviour):
+        async def run(self):
+            if self.agent.latest_data is not None:
+                print("[DEBUG] 预测行为被触发")  # 添加调试语句
+                try:
+                    # 打印原始输入数据
+                    print("\n[Input Raw] 原始输入数据维度：", self.agent.latest_data.shape)
+                    # 预处理
+                    # processed = self.agent.predictor.preprocess(self.agent.latest_data)
+                    
+                    # 执行预测
+                    prediction = self.agent.predictor.predict(self.agent.latest_data)
+                    self.agent.current_prediction = {
+                        'timestamp': pd.Timestamp.now().isoformat(),
+                        'hourly_production': float(prediction[0]),  # 示例值
+                        'hourly_consumption': float(prediction[1])
+                    }
+
+                    # 打印预测结果
+                    print("\n[Output Prediction] 预测结果：")
+                    print(f"生产预测: {self.agent.current_prediction['hourly_production']} kW")
+                    print(f"消费预测: {self.agent.current_prediction['hourly_consumption']} kW")
+                    
+                    # 发送给协商Agent
+                    msg = Message(to="negotiation_agent@your_domain")
+                    msg.set_metadata("performative", "inform")
+                    msg.body = json.dumps(self.agent.current_prediction)
+                    await self.send(msg)
+                    print("[Prediction] Sent new prediction")
+                except Exception as e:
+                    print(f"预测失败: {str(e)}")
+                    error_msg = Message(to="monitor@your_domain")
+                    error_msg.body = json.dumps({
+                        "agent": str(self.agent.jid),
+                        "error": f"Prediction failed: {str(e)}"
+                    })
+                    await self.send(error_msg)
+            else:
+                print("[Prediction] NO DATA !!!")
+
+    # 行为3：处理外部请求
+    class MessageHandlerBehaviour(CyclicBehaviour):
+        async def run(self):
+            msg = await self.receive(timeout=10)
+            if msg:
+                # 处理预测结果请求
+                if msg.body == "REQUEST_PREDICTION":
+                    response = msg.make_reply()
+                    response.body = json.dumps(
+                        self.agent.current_prediction or {"status": "no_data"}
+                    )
+                    await self.send(response)
+
+                # 处理数据更新指令
+                elif "UPDATE_DATA" in msg.body:
+                    try:
+                        new_data = pd.read_json(msg.body.split("|")[1])
+                        self.agent.latest_data = new_data
+                        print("[Prediction] Received new data update")
+                    except Exception as e:
+                        print(f"Data update error: {str(e)}")
+
+async def run_agent():
+    # 使用 sure.im 前需通过其官网注册账户：https://www.sure.im/
+    agent = PredictionAgent("prediction_agent@sure.im", "123456")
+    await agent.start()  # 关键：使用await
     
-    def visualize(self, prediction):
-        """可视化结果"""
-        plt.figure(figsize=(12, 6))
-        plt.plot(self.df['Global_active_power'][-100:], label='Historical')
-        plt.plot(np.arange(100, 100+self.forecast_steps), prediction, 
-                'r--', label='Predicted')
-        plt.legend()
-        plt.title('Power Consumption Prediction')
-        plt.show()
-        
-    def run(self):
-        """完整流程"""
-        self.load_data()
-        self.prepare_data()
-        self.build_model()
-        self.train(epochs=1)
-        
-        # 预测并可视化
-        last_data = self.scaled_data[-self.lookback:]
-        print(last_data.shape) # (24, 7)
-        ddd
-        prediction = self.predict(last_data)
-        self.visualize(prediction)
+    # 保持Agent运行
+    try:
+        while True:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        await agent.stop()
+
+# if __name__ == "__main__":
+#     agent = PredictionAgent(
+#         "prediction_agent@your_xmpp_server",
+#         "password"
+#     )
+#     agent.start()
+    
+#     # 保持Agent运行
+#     import time
+#     try:
+#         while True:
+#             time.sleep(1)
+#     except KeyboardInterrupt:
+#         agent.stop()
 
 if __name__ == "__main__":
-    predictor = PowerPredictor('household_power_consumption.csv')
-    predictor.run()
+    asyncio.run(run_agent())  # 通过事件循环启动
+
+# // 发送给协商Agent的预测消息
+# {
+#   "timestamp": "2023-10-01T14:30:00",
+#   "hourly_production": 12.5,
+#   "hourly_consumption": 9.8
+# }
+
+# // 错误报告消息
+# {
+#   "agent": "prediction_agent@your_domain",
+#   "error": "Prediction failed: invalid input shape"
+# }
