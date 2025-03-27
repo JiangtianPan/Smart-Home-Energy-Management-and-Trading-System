@@ -1,53 +1,43 @@
-import sqlite3
+import os
+import json
+
+ORDERS_FILE = "data/orders.json"
 
 class DatabaseManager:
     def __init__(self):
-        self.conn = sqlite3.connect("orders.db")
-        self.cursor = self.conn.cursor()
-        self.setup_database()
-
-    def setup_database(self):
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user TEXT,
-                order_type TEXT,
-                amount REAL,
-                price REAL,
-                status TEXT DEFAULT 'Pending'
-            )
-        """)
-        self.cursor.execute("""
-            CREATE TABLE IF NOT EXISTS trades (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                buyer TEXT,
-                seller TEXT,
-                amount REAL,
-                price REAL
-            )
-        """)
-        self.conn.commit()
+        os.makedirs("data", exist_ok=True)
+        if not os.path.exists(ORDERS_FILE):
+            with open(ORDERS_FILE, "w") as f:
+                json.dump([], f)
 
     def store_order(self, order):
-        self.cursor.execute("INSERT INTO orders (user, order_type, amount, price) VALUES (?, ?, ?, ?)",
-                            (order['user'], order['type'], order['amount'], order['price']))
-        self.conn.commit()
+        orders = self.get_all_orders()
+        order["id"] = len(orders) + 1  # generate order id
+        orders.append(order)
+        with open(ORDERS_FILE, "w") as f:
+            json.dump(orders, f)
+
+    def get_all_orders(self):
+        with open(ORDERS_FILE, "r") as f:
+            return json.load(f)
 
     def match_orders(self):
-        self.cursor.execute("SELECT * FROM orders WHERE order_type='buy' ORDER BY price DESC")
-        buy_orders = self.cursor.fetchall()
-        self.cursor.execute("SELECT * FROM orders WHERE order_type='sell' ORDER BY price ASC")
-        sell_orders = self.cursor.fetchall()
+        orders = self.get_all_orders()
+        buys = [o for o in orders if o["type"] == "buy" and o["status"] == "open"]
+        sells = [o for o in orders if o["type"] == "sell" and o["status"] == "open"]
 
-        matched_orders = []
-        while buy_orders and sell_orders:
-            buy_order = buy_orders[0]
-            sell_order = sell_orders[0]
-            if buy_order[3] >= sell_order[3]:  # buy price >= sell price
-                trade_amount = min(buy_order[2], sell_order[2])
-                self.cursor.execute("INSERT INTO trades (buyer, seller, amount, price) VALUES (?, ?, ?, ?)",
-                                    (buy_order[1], sell_order[1], trade_amount, sell_order[3]))
-                self.conn.commit()
-                buy_orders.pop(0)
-                sell_orders.pop(0)
-        return matched_orders
+        for buy in buys:
+            for sell in sells:
+                if sell["amount"] == buy["amount"] and sell["price"] <= buy["price"]:
+                    buy["status"] = "matched"
+                    sell["status"] = "matched"
+                    print(f"[MATCH] {buy['user']} 买入 ← {sell['user']} 卖出 成交！")
+
+        with open(ORDERS_FILE, "w") as f:
+            json.dump(orders, f)
+
+# Path: backend/p2p_trading/utils/db_helper.py
+def get_open_orders():
+    db = DatabaseManager()
+    orders = db.get_all_orders()
+    return [o for o in orders if o["status"] == "open"]

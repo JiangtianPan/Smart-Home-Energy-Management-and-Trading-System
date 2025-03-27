@@ -1,22 +1,21 @@
 from spade import agent, behaviour, message
 import json
-from database.db_manager import DatabaseManager
+from backend.p2p_trading.utils.db_helper import DatabaseManager
 
 class MarketAgent(agent.Agent):
     class OrderMatchingBehaviour(behaviour.CyclicBehaviour):
         async def run(self):
-            msg = await self.receive(timeout=10)
+            msg = await self.receive(timeout=10)  # wait for incoming messages
             if msg:
-                order = json.loads(msg.body)
-                print(f"[Market] Received order: {order}")
-                db = DatabaseManager()
-                db.store_order(order)
-                db.match_orders()
+                try:
+                    order = json.loads(msg.body)
+                    print(f"[Market] Received order: {order}")
+                    db = DatabaseManager()
+                    db.store_order(order)
+                    db.match_orders()
+                except Exception as e:
+                    print(f"[Market] Error processing order: {e}")
 
     async def setup(self):
         print("[Market] Market Agent started")
         self.add_behaviour(self.OrderMatchingBehaviour())
-
-if __name__ == "__main__":
-    market_agent = MarketAgent("market@localhost", "password")
-    market_agent.start()
