@@ -1,6 +1,6 @@
 from spade import agent, behaviour, message
 import json
-from backend.p2p_trading.utils.db_helper import DatabaseManager
+from p2p_trading.utils.db_helper import DatabaseManager
 
 class MarketAgent(agent.Agent):
     class OrderMatchingBehaviour(behaviour.CyclicBehaviour):

@@ -1,10 +1,10 @@
 from flask import Flask, request, jsonify
 import asyncio
 import threading
-from backend.p2p_trading.agents.trader_agent import TraderAgent
-from backend.p2p_trading.agents.market_agent import MarketAgent
-from backend.p2p_trading.utils.db_helper import get_open_orders
-from backend.p2p_trading.utils.config import TRADER_AGENT_JID, MARKET_AGENT_JID, PASSWORD
+from p2p_trading.agents.trader_agent import TraderAgent
+from p2p_trading.agents.market_agent import MarketAgent
+from p2p_trading.utils.db_helper import get_open_orders
+from p2p_trading.utils.config import TRADER_AGENT_JID, MARKET_AGENT_JID, PASSWORD
 
 app = Flask(__name__)
 
