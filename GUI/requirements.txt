@@ -1,7 +1,0 @@
-dash==2.11.1
-dash-bootstrap-components==1.4.1
-plotly==5.18.0
-requests==2.31.0
-fastapi==0.104.1
-uvicorn==0.23.2
-python-multipart==0.0.6
