@@ -33,7 +33,7 @@ class MarketAgent(agent.Agent):
     #     async def run(self):
     #         print("[Market] MessageListener active, waiting for messages...")
     #         try:
-    #             msg = await self.receive(timeout=30)  # 使用更长的超时时间
+    #             msg = await self.receive(timeout=30)
     #             if msg:
     #                 print(f"[Market] MessageListener received message from {msg.sender}")
     #                 try:
