@@ -63,7 +63,7 @@
         price: parseFloat(document.getElementById('price').value)
       };
 
-      const res = await fetch('http://localhost:5000/submit_order', {
+      const res = await fetch('/submit_order', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(order)
@@ -76,7 +76,7 @@
     });
 
     async function loadOrders() {
-      const res = await fetch('http://localhost:5000/orders');
+      const res = await fetch('/orders');
       const orders = await res.json();
       orderList.innerHTML = '';
       orders.forEach(o => {
@@ -86,7 +86,6 @@
       });
     }
 
-    // auto-refresh orders every 3 seconds
     setInterval(loadOrders, 3000);
     loadOrders();
   </script>
