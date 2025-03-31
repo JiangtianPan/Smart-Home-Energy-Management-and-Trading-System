@@ -6,7 +6,7 @@ import threading
 import traceback
 from p2p_trading.agents.trader_agent import TraderAgent
 from p2p_trading.agents.market_agent import MarketAgent
-from p2p_trading.utils.db_helper import get_open_orders
+from p2p_trading.utils.db_helper import get_open_orders, DatabaseManager
 from p2p_trading.utils.config import TRADER_AGENT_JID, MARKET_AGENT_JID, PASSWORD
 import time
 
@@ -94,6 +94,37 @@ def get_orders():
         return jsonify(orders)
     except Exception as e:
         print(f"[API] Error getting orders: {e}")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+# api delete_order
+@app.route("/delete_order/<int:order_id>", methods=["DELETE"])
+def delete_order(order_id):
+    try:
+        print(f"[API] Received request to delete order: {order_id}")
+        db = DatabaseManager()
+        result = db.delete_order(order_id)
+        
+        if result:
+            return jsonify({"message": f"Order {order_id} deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Order not found or could not be deleted"}), 404
+    except Exception as e:
+        print(f"[API] Error deleting order: {e}")
+        print(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+# api get_trade_history
+@app.route("/trade_history", methods=["GET"])
+def get_trade_history():
+    try:
+        print("[API] Received request for trade history")
+        db = DatabaseManager()
+        matched_orders = db.get_matched_orders()
+        print(f"[API] Found {len(matched_orders)} matched orders")
+        return jsonify(matched_orders)
+    except Exception as e:
+        print(f"[API] Error getting trade history: {e}")
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 

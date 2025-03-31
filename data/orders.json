@@ -2,9 +2,21 @@
   {
     "user": "user1",
     "type": "buy",
-    "amount": 10,
+    "amount": 5,
     "price": 1.2,
-    "status": "open",
-    "id": 1
+    "status": "matched",
+    "id": 1,
+    "matched_with": 2,
+    "match_time": "2025-03-30 21:49:08"
+  },
+  {
+    "user": "user2",
+    "type": "sell",
+    "amount": 5,
+    "price": 1.2,
+    "status": "matched",
+    "id": 2,
+    "matched_with": 1,
+    "match_time": "2025-03-30 21:49:08"
   }
 ]
