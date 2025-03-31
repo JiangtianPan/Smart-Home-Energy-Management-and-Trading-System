@@ -39,75 +39,191 @@
             background-color: #fd7e14;
             color: white;
         }
+        #loginForm {
+            max-width: 500px;
+            margin: 50px auto;
+        }
+        .user-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 50px;
+            background-color: #e9ecef;
+            margin-right: 5px;
+            font-size: 0.85em;
+        }
+        .my-order {
+            background-color: rgba(40, 167, 69, 0.1);
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-center mb-4">P2P Energy Trading Platform</h1>
+        <!-- Login Form - Initially visible, hidden after login -->
+        <div id="loginFormContainer" class="card">
+            <div class="card-header">
+                <h5>P2P Energy Trading Platform - Login</h5>
+            </div>
+            <div class="card-body">
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username:</label>
+                        <input type="text" class="form-control" id="username" placeholder="user1, user2, or user3" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password:</label>
+                        <input type="password" class="form-control" id="password" placeholder="password1, password2, or password3" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Login</button>
+                </form>
+            </div>
+        </div>
         
-        <ul class="nav nav-tabs" id="myTab" role="tablist">
-            <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="trading-tab" data-bs-toggle="tab" data-bs-target="#trading" type="button" role="tab" aria-selected="true">Trading</button>
-            </li>
-            <li class="nav-item" role="presentation">
-                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-selected="false">Trade History</button>
-            </li>
-        </ul>
-        
-        <div class="tab-content" id="myTabContent">
-            <div class="tab-pane fade show active" id="trading" role="tabpanel">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>Submit New Order</h5>
+        <!-- Main Content - Initially hidden, visible after login -->
+        <div id="mainContent" style="display: none;">
+            <div id="userBar" class="alert alert-success mb-4 d-flex justify-content-between align-items-center">
+                <span>Logged in as: <strong id="currentUsername"></strong></span>
+                <button id="logoutButton" class="btn btn-sm btn-outline-secondary">Logout</button>
+            </div>
+            
+            <h1 class="text-center mb-4">P2P Energy Trading Platform</h1>
+            
+            <ul class="nav nav-tabs" id="myTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="trading-tab" data-bs-toggle="tab" data-bs-target="#trading" type="button" role="tab" aria-selected="true">Trading</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-selected="false">Trade History</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="my-orders-tab" data-bs-toggle="tab" data-bs-target="#my-orders" type="button" role="tab" aria-selected="false">My Orders</button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="myTabContent">
+                <div class="tab-pane fade show active" id="trading" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5>Submit New Order</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="orderForm">
+                                <!-- Removed user field as it's now taken from session -->
+                                <div class="mb-3">
+                                    <label for="type" class="form-label">Type:</label>
+                                    <select class="form-select" id="type" required>
+                                        <option value="buy">Buy</option>
+                                        <option value="sell">Sell</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="amount" class="form-label">Amount (kWh):</label>
+                                    <input type="number" class="form-control" id="amount" min="0.1" step="0.1" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="price" class="form-label">Price ($):</label>
+                                    <input type="number" class="form-control" id="price" min="0.01" step="0.01" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Submit Order</button>
+                            </form>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <form id="orderForm">
-                            <div class="mb-3">
-                                <label for="user" class="form-label">User:</label>
-                                <input type="text" class="form-control" id="user" required>
+                    
+                    <!-- Smart Trading Assistant Section -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5>Smart Trading Assistant</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Production Prediction</h6>
+                                            <p class="card-text text-muted">Get energy production forecast for your system</p>
+                                            <button class="btn btn-sm btn-outline-primary" id="predictProductionBtn" disabled>
+                                                <span class="badge bg-info">Coming Soon</span>
+                                                Predict Production
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Consumption Prediction</h6>
+                                            <p class="card-text text-muted">Get energy consumption forecast for your household</p>
+                                            <button class="btn btn-sm btn-outline-primary" id="predictConsumptionBtn" disabled>
+                                                <span class="badge bg-info">Coming Soon</span>
+                                                Predict Consumption
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Price Optimization</h6>
+                                            <p class="card-text text-muted">Get optimal price suggestions based on market analysis</p>
+                                            <button class="btn btn-sm btn-outline-primary" id="optimalPriceBtn" disabled>
+                                                <span class="badge bg-info">Coming Soon</span>
+                                                Get Optimal Price
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body">
+                                            <h6 class="card-title">Demand Response</h6>
+                                            <p class="card-text text-muted">Participate in grid balancing and earn incentives</p>
+                                            <button class="btn btn-sm btn-outline-primary" id="demandResponseBtn" disabled>
+                                                <span class="badge bg-info">Coming Soon</span>
+                                                Check Opportunities
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="type" class="form-label">Type:</label>
-                                <select class="form-select" id="type" required>
-                                    <option value="buy">Buy</option>
-                                    <option value="sell">Sell</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="amount" class="form-label">Amount (kWh):</label>
-                                <input type="number" class="form-control" id="amount" min="0.1" step="0.1" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="price" class="form-label">Price ($):</label>
-                                <input type="number" class="form-control" id="price" min="0.01" step="0.01" required>
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Submit Order</button>
-                        </form>
+                        </div>
                     </div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Open Orders</h5>
-                        <button class="btn btn-sm btn-outline-secondary" id="refreshOrders">Refresh</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="ordersList" class="list-group">
-                            <!-- Orders will be populated here -->
+                    
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Open Orders</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshOrders">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="ordersList" class="list-group">
+                                <!-- Orders will be populated here -->
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="tab-pane fade" id="history" role="tabpanel">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0">Trade History</h5>
-                        <button class="btn btn-sm btn-outline-secondary" id="refreshHistory">Refresh</button>
+                
+                <div class="tab-pane fade" id="history" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Trade History</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshHistory">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="historyList" class="list-group">
+                                <!-- Trade history will be populated here -->
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div id="historyList" class="list-group">
-                            <!-- Trade history will be populated here -->
+                </div>
+                
+                <div class="tab-pane fade" id="my-orders" role="tabpanel">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">My Orders</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshMyOrders">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="myOrdersList" class="list-group">
+                                <!-- My orders will be populated here -->
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -118,10 +234,21 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Initial load
-            loadOrders();
+            // Check if user is already logged in
+            checkLoginStatus();
             
-            // Form submission
+            // Login form submission
+            document.getElementById('loginForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                login();
+            });
+            
+            // Logout button
+            document.getElementById('logoutButton').addEventListener('click', function() {
+                logout();
+            });
+            
+            // Order form submission
             document.getElementById('orderForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitOrder();
@@ -130,14 +257,83 @@
             // Refresh buttons
             document.getElementById('refreshOrders').addEventListener('click', loadOrders);
             document.getElementById('refreshHistory').addEventListener('click', loadHistory);
+            document.getElementById('refreshMyOrders').addEventListener('click', loadMyOrders);
             
             // Tab switching
             document.getElementById('history-tab').addEventListener('click', loadHistory);
+            document.getElementById('my-orders-tab').addEventListener('click', loadMyOrders);
         });
         
+        // Check if user is logged in
+        function checkLoginStatus() {
+            fetch('/current_user')
+            .then(response => response.json())
+            .then(data => {
+                if (data.logged_in) {
+                    // User is logged in
+                    document.getElementById('loginFormContainer').style.display = 'none';
+                    document.getElementById('mainContent').style.display = 'block';
+                    document.getElementById('currentUsername').textContent = data.username;
+                    
+                    // Load initial data
+                    loadOrders();
+                } else {
+                    // User is not logged in
+                    document.getElementById('loginFormContainer').style.display = 'block';
+                    document.getElementById('mainContent').style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error checking login status:', error);
+            });
+        }
+        
+        // Handle login
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    // Login successful
+                    checkLoginStatus();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error during login');
+            });
+        }
+        
+        // Handle logout
+        function logout() {
+            fetch('/logout', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Logout successful
+                checkLoginStatus();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error during logout');
+            });
+        }
+        
+        // Submit a new order (user is automatically added server-side)
         function submitOrder() {
             const order = {
-                user: document.getElementById('user').value,
                 type: document.getElementById('type').value,
                 amount: parseFloat(document.getElementById('amount').value),
                 price: parseFloat(document.getElementById('price').value)
@@ -152,10 +348,15 @@
             })
             .then(response => response.json())
             .then(data => {
-                alert('Order submitted successfully!');
-                loadOrders();
-                // Reset form
-                document.getElementById('orderForm').reset();
+                if (data.error) {
+                    alert(data.error);
+                } else {
+                    alert('Order submitted successfully!');
+                    loadOrders();
+                    loadMyOrders();
+                    // Reset form
+                    document.getElementById('orderForm').reset();
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -163,9 +364,17 @@
             });
         }
         
+        // Load all open orders
         function loadOrders() {
             fetch('/orders')
-            .then(response => response.json())
+            .then(response => {
+                if (response.status === 401) {
+                    // Unauthorized, redirect to login
+                    checkLoginStatus();
+                    throw new Error('Unauthorized');
+                }
+                return response.json();
+            })
             .then(orders => {
                 const ordersList = document.getElementById('ordersList');
                 ordersList.innerHTML = '';
@@ -175,12 +384,161 @@
                     return;
                 }
                 
+                // Get current username for highlighting
+                fetch('/current_user')
+                .then(response => response.json())
+                .then(userData => {
+                    const currentUser = userData.username;
+                    
+                    orders.forEach(order => {
+                        const orderType = order.type.toLowerCase();
+                        const orderClass = orderType === 'buy' ? 'order-buy' : 'order-sell';
+                        const orderTypeDisplay = orderType === 'buy' ? 'Buy' : 'Sell';
+                        const isMyOrder = order.user === currentUser;
+                        
+                        // Add original order ID info if present
+                        let originalOrderInfo = '';
+                        if (order.original_order_id) {
+                            originalOrderInfo = ` (from order #${order.original_order_id})`;
+                        }
+                        
+                        const orderElement = document.createElement('div');
+                        orderElement.className = `list-group-item d-flex justify-content-between align-items-center order-item ${orderClass} ${isMyOrder ? 'my-order' : ''}`;
+                        
+                        let deleteButton = '';
+                        if (isMyOrder) {
+                            deleteButton = `<button class="btn btn-sm btn-outline-danger delete-order" data-id="${order.id}">Delete</button>`;
+                        }
+                        
+                        orderElement.innerHTML = `
+                            <span>
+                                <span class="user-badge">${order.user}</span>
+                                wants to 
+                                <span class="${orderType === 'buy' ? 'text-success' : 'text-danger'}">${orderTypeDisplay}</span> 
+                                ${order.amount} kWh at $${order.price} [${order.status}]${originalOrderInfo}
+                                ${isMyOrder ? '<span class="badge bg-secondary ms-2">Your Order</span>' : ''}
+                            </span>
+                            ${deleteButton}
+                        `;
+                        ordersList.appendChild(orderElement);
+                    });
+                    
+                    // Add event listeners for delete buttons
+                    document.querySelectorAll('.delete-order').forEach(button => {
+                        button.addEventListener('click', function() {
+                            deleteOrder(this.dataset.id);
+                        });
+                    });
+                });
+            })
+            .catch(error => {
+                if (error.message !== 'Unauthorized') {
+                    console.error('Error:', error);
+                    document.getElementById('ordersList').innerHTML = '<p class="text-center text-danger">Error loading orders</p>';
+                }
+            });
+        }
+        
+        // Load trade history
+        function loadHistory() {
+            fetch('/trade_history')
+            .then(response => {
+                if (response.status === 401) {
+                    // Unauthorized, redirect to login
+                    checkLoginStatus();
+                    throw new Error('Unauthorized');
+                }
+                return response.json();
+            })
+            .then(trades => {
+                const historyList = document.getElementById('historyList');
+                historyList.innerHTML = '';
+                
+                if (trades.length === 0) {
+                    historyList.innerHTML = '<p class="text-center text-muted">No trade history</p>';
+                    return;
+                }
+                
+                // Get current username for highlighting
+                fetch('/current_user')
+                .then(response => response.json())
+                .then(userData => {
+                    const currentUser = userData.username;
+                    
+                    trades.forEach(trade => {
+                        const tradeType = trade.type.toLowerCase();
+                        const tradeClass = tradeType === 'buy' ? 'order-buy' : 'order-sell';
+                        const isMyTrade = trade.user === currentUser;
+                        
+                        // Get match status display
+                        let statusBadge = '';
+                        if (trade.status === 'partially_matched') {
+                            statusBadge = '<span class="badge bg-warning">Partial</span> ';
+                        }
+                        
+                        const tradeElement = document.createElement('div');
+                        tradeElement.className = `list-group-item order-item ${tradeClass} ${isMyTrade ? 'my-order' : ''}`;
+                        tradeElement.innerHTML = `
+                            <div>
+                                ${statusBadge}
+                                <span class="user-badge">${trade.user}</span>
+                                ${tradeType} ${trade.amount} kWh at $${trade.price}
+                                ${isMyTrade ? '<span class="badge bg-secondary ms-2">Your Trade</span>' : ''}
+                            </div>
+                            <div class="text-muted small">
+                                Order ID: ${trade.id}
+                                ${trade.match_time ? ' - Matched: ' + trade.match_time : ''}
+                                ${trade.matched_with ? ' - Matched with order #' + trade.matched_with : ''}
+                            </div>
+                        `;
+                        historyList.appendChild(tradeElement);
+                    });
+                });
+            })
+            .catch(error => {
+                if (error.message !== 'Unauthorized') {
+                    console.error('Error:', error);
+                    document.getElementById('historyList').innerHTML = '<p class="text-center text-danger">Error loading trade history</p>';
+                }
+            });
+        }
+        
+        // Load user's own orders (open, matched, partially matched)
+        function loadMyOrders() {
+            fetch('/my_orders')
+            .then(response => {
+                if (response.status === 401) {
+                    // Unauthorized, redirect to login
+                    checkLoginStatus();
+                    throw new Error('Unauthorized');
+                }
+                return response.json();
+            })
+            .then(orders => {
+                const myOrdersList = document.getElementById('myOrdersList');
+                myOrdersList.innerHTML = '';
+                
+                if (orders.length === 0) {
+                    myOrdersList.innerHTML = '<p class="text-center text-muted">You have no orders</p>';
+                    return;
+                }
+                
                 orders.forEach(order => {
                     const orderType = order.type.toLowerCase();
                     const orderClass = orderType === 'buy' ? 'order-buy' : 'order-sell';
                     const orderTypeDisplay = orderType === 'buy' ? 'Buy' : 'Sell';
                     
-                    // 添加原始订单ID信息（如果是部分匹配创建的新订单）
+                    // Add status badge
+                    let statusBadge = '';
+                    if (order.status === 'open') {
+                        statusBadge = '<span class="badge bg-primary">Open</span>';
+                    } else if (order.status === 'matched') {
+                        statusBadge = '<span class="badge bg-success">Matched</span>';
+                    } else if (order.status === 'partially_matched') {
+                        statusBadge = '<span class="badge bg-warning">Partially Matched</span>';
+                    }
+                    
+                    // Add original order ID info if present
                     let originalOrderInfo = '';
                     if (order.original_order_id) {
                         originalOrderInfo = ` (from order #${order.original_order_id})`;
@@ -188,15 +546,25 @@
                     
                     const orderElement = document.createElement('div');
                     orderElement.className = `list-group-item d-flex justify-content-between align-items-center order-item ${orderClass}`;
+                    
+                    let deleteButton = '';
+                    if (order.status === 'open') {
+                        deleteButton = `<button class="btn btn-sm btn-outline-danger delete-order" data-id="${order.id}">Delete</button>`;
+                    }
+                    
                     orderElement.innerHTML = `
-                        <span>
-                            <strong>${order.user}</strong> wants to 
+                        <div>
+                            ${statusBadge}
+                            You want to 
                             <span class="${orderType === 'buy' ? 'text-success' : 'text-danger'}">${orderTypeDisplay}</span> 
-                            ${order.amount} kWh at $${order.price} [${order.status}]${originalOrderInfo}
-                        </span>
-                        <button class="btn btn-sm btn-outline-danger delete-order" data-id="${order.id}">Delete</button>
+                            ${order.amount} kWh at $${order.price}${originalOrderInfo}
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <div class="text-muted small me-3">Order ID: ${order.id}</div>
+                            ${deleteButton}
+                        </div>
                     `;
-                    ordersList.appendChild(orderElement);
+                    myOrdersList.appendChild(orderElement);
                 });
                 
                 // Add event listeners for delete buttons
@@ -207,70 +575,41 @@
                 });
             })
             .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('ordersList').innerHTML = '<p class="text-center text-danger">Error loading orders</p>';
-            });
-        }
-        
-        function loadHistory() {
-            fetch('/trade_history')
-            .then(response => response.json())
-            .then(trades => {
-                const historyList = document.getElementById('historyList');
-                historyList.innerHTML = '';
-                
-                if (trades.length === 0) {
-                    historyList.innerHTML = '<p class="text-center text-muted">No trade history</p>';
-                    return;
+                if (error.message !== 'Unauthorized') {
+                    console.error('Error:', error);
+                    document.getElementById('myOrdersList').innerHTML = '<p class="text-center text-danger">Error loading your orders</p>';
                 }
-                
-                trades.forEach(trade => {
-                    const tradeType = trade.type.toLowerCase();
-                    const tradeClass = tradeType === 'buy' ? 'order-buy' : 'order-sell';
-                    
-                    // 获取匹配状态显示文本
-                    let matchStatusText = '';
-                    let statusBadge = '';
-                    if (trade.status === 'partially_matched') {
-                        matchStatusText = ' (Partially Matched)';
-                        statusBadge = '<span class="badge bg-warning">Partial</span> ';
-                    }
-                    
-                    const tradeElement = document.createElement('div');
-                    tradeElement.className = `list-group-item order-item ${tradeClass}`;
-                    tradeElement.innerHTML = `
-                        <div>${statusBadge}<strong>${trade.user}</strong> ${tradeType} ${trade.amount} kWh at $${trade.price}${matchStatusText}</div>
-                        <div class="text-muted small">
-                            Order ID: ${trade.id}
-                            ${trade.match_time ? ' - Matched: ' + trade.match_time : ''}
-                            ${trade.matched_with ? ' - Matched with order #' + trade.matched_with : ''}
-                        </div>
-                    `;
-                    historyList.appendChild(tradeElement);
-                });
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('historyList').innerHTML = '<p class="text-center text-danger">Error loading trade history</p>';
             });
         }
         
+        // Delete an order
         function deleteOrder(orderId) {
             if (confirm(`Are you sure you want to delete order #${orderId}?`)) {
                 fetch(`/delete_order/${orderId}`, {
                     method: 'DELETE'
                 })
                 .then(response => {
-                    if (response.ok) {
+                    if (response.status === 401) {
+                        // Unauthorized, redirect to login
+                        checkLoginStatus();
+                        throw new Error('Unauthorized');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.error) {
+                        alert(data.error);
+                    } else {
                         alert('Order deleted successfully');
                         loadOrders();
-                    } else {
-                        alert('Error deleting order');
+                        loadMyOrders();
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error deleting order');
+                    if (error.message !== 'Unauthorized') {
+                        console.error('Error:', error);
+                        alert('Error deleting order');
+                    }
                 });
             }
         }
