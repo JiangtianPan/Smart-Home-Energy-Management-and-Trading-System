@@ -35,6 +35,10 @@
         .order-sell {
             border-left-color: #dc3545;
         }
+        .badge-partial {
+            background-color: #fd7e14;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -176,13 +180,19 @@
                     const orderClass = orderType === 'buy' ? 'order-buy' : 'order-sell';
                     const orderTypeDisplay = orderType === 'buy' ? 'Buy' : 'Sell';
                     
+                    // 添加原始订单ID信息（如果是部分匹配创建的新订单）
+                    let originalOrderInfo = '';
+                    if (order.original_order_id) {
+                        originalOrderInfo = ` (from order #${order.original_order_id})`;
+                    }
+                    
                     const orderElement = document.createElement('div');
                     orderElement.className = `list-group-item d-flex justify-content-between align-items-center order-item ${orderClass}`;
                     orderElement.innerHTML = `
                         <span>
                             <strong>${order.user}</strong> wants to 
                             <span class="${orderType === 'buy' ? 'text-success' : 'text-danger'}">${orderTypeDisplay}</span> 
-                            ${order.amount} kWh at $${order.price} [${order.status}]
+                            ${order.amount} kWh at $${order.price} [${order.status}]${originalOrderInfo}
                         </span>
                         <button class="btn btn-sm btn-outline-danger delete-order" data-id="${order.id}">Delete</button>
                     `;
@@ -218,11 +228,23 @@
                     const tradeType = trade.type.toLowerCase();
                     const tradeClass = tradeType === 'buy' ? 'order-buy' : 'order-sell';
                     
+                    // 获取匹配状态显示文本
+                    let matchStatusText = '';
+                    let statusBadge = '';
+                    if (trade.status === 'partially_matched') {
+                        matchStatusText = ' (Partially Matched)';
+                        statusBadge = '<span class="badge bg-warning">Partial</span> ';
+                    }
+                    
                     const tradeElement = document.createElement('div');
                     tradeElement.className = `list-group-item order-item ${tradeClass}`;
                     tradeElement.innerHTML = `
-                        <div><strong>${trade.user}</strong> ${tradeType} ${trade.amount} kWh at $${trade.price}</div>
-                        <div class="text-muted small">Order ID: ${trade.id}</div>
+                        <div>${statusBadge}<strong>${trade.user}</strong> ${tradeType} ${trade.amount} kWh at $${trade.price}${matchStatusText}</div>
+                        <div class="text-muted small">
+                            Order ID: ${trade.id}
+                            ${trade.match_time ? ' - Matched: ' + trade.match_time : ''}
+                            ${trade.matched_with ? ' - Matched with order #' + trade.matched_with : ''}
+                        </div>
                     `;
                     historyList.appendChild(tradeElement);
                 });

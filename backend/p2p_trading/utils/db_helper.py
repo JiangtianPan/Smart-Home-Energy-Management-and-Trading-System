@@ -39,7 +39,7 @@ class DatabaseManager:
         except Exception as e:
             print(f"[DB] Error storing order: {e}")
             print(traceback.format_exc())
-            # 紧急措施：直接将订单写入备用文件
+            # Emergency measure: write the order directly to a backup file
             try:
                 with open("data/emergency_orders.json", "a") as f:
                     f.write(json.dumps(order) + "\n")
@@ -73,14 +73,20 @@ class DatabaseManager:
             sells = [o for o in orders if o["type"] == "sell" and o["status"] == "open"]
             print(f"[DB] Found {len(buys)} buy orders and {len(sells)} sell orders")
 
-            # 按价格排序 - 买方降序（最高出价优先），卖方升序（最低售价优先）
-            buys.sort(key=lambda x: x["price"], reverse=True)
-            sells.sort(key=lambda x: x["price"])
+            # Sort by price (primary) and quantity (secondary)
+            # For buys: price descending, amount descending
+            buys.sort(key=lambda x: (x["price"], x["amount"]), reverse=True)
+            # For sells: price ascending, amount descending (using negative to achieve descending)
+            sells.sort(key=lambda x: (x["price"], -x["amount"]))
+            
+            print(f"[DB] Sorted buy orders: {[(o['id'], o['price'], o['amount']) for o in buys]}")
+            print(f"[DB] Sorted sell orders: {[(o['id'], o['price'], o['amount']) for o in sells]}")
             
             matches_found = 0
-            matched_ids = set()  # 跟踪已匹配的订单ID
+            matched_ids = set()  # Track already matched order IDs
+            new_orders = []  # Store new orders created due to partial matching
             
-            # 尝试匹配
+            # Try to match orders
             for buy in buys:
                 if buy["id"] in matched_ids:
                     continue
@@ -89,28 +95,101 @@ class DatabaseManager:
                     if sell["id"] in matched_ids:
                         continue
                         
-                    # 匹配条件：数量相等且买入价格 >= 卖出价格
-                    if sell["amount"] == buy["amount"] and sell["price"] <= buy["price"]:
-                        # 匹配成功
-                        buy["status"] = "matched"
-                        sell["status"] = "matched"
-                        buy["matched_with"] = sell["id"]
-                        sell["matched_with"] = buy["id"]
-                        buy["match_time"] = time.strftime("%Y-%m-%d %H:%M:%S")
-                        sell["match_time"] = buy["match_time"]
+                    # Price matching condition: buy price >= sell price
+                    if sell["price"] <= buy["price"]:
+                        match_time = time.strftime("%Y-%m-%d %H:%M:%S")
                         
-                        matched_ids.add(buy["id"])
-                        matched_ids.add(sell["id"])
-                        matches_found += 1
+                        # Case 1: Quantities are equal - Complete match
+                        if sell["amount"] == buy["amount"]:
+                            # Complete match
+                            buy["status"] = "matched"
+                            sell["status"] = "matched"
+                            buy["matched_with"] = sell["id"]
+                            sell["matched_with"] = buy["id"]
+                            buy["match_time"] = match_time
+                            sell["match_time"] = match_time
+                            
+                            matched_ids.add(buy["id"])
+                            matched_ids.add(sell["id"])
+                            matches_found += 1
+                            
+                            print(f"[MATCH] Complete match: {buy['user']} buys ← {sell['user']} sells! Price: ${buy['price']} Amount: {buy['amount']} kWh")
+                            break  # Found a complete match for this buy order, move to next buy order
                         
-                        print(f"[MATCH] {buy['user']} 买入 ← {sell['user']} 卖出 成交! 价格: ${buy['price']} 数量: {buy['amount']} kWh")
-                        break  # 已为此买单找到匹配，移至下一个买单
+                        # Case 2: Buy amount > Sell amount - Partial match for buy, complete match for sell
+                        elif buy["amount"] > sell["amount"]:
+                            # Create complete match for sell order
+                            sell["status"] = "matched"
+                            sell["matched_with"] = buy["id"]
+                            sell["match_time"] = match_time
+                            
+                            # Create partial match for buy order
+                            buy["status"] = "partially_matched"
+                            
+                            # Create new buy order for remaining amount
+                            remaining_amount = buy["amount"] - sell["amount"]
+                            new_buy_order = buy.copy()
+                            new_buy_order["id"] = None  # Will be generated when saved
+                            new_buy_order["status"] = "open"
+                            new_buy_order["amount"] = remaining_amount
+                            new_buy_order["original_order_id"] = buy["id"]
+                            new_orders.append(new_buy_order)
+                            
+                            # Update original buy order to reflect matched portion
+                            buy["amount"] = sell["amount"]
+                            buy["matched_with"] = sell["id"]
+                            buy["match_time"] = match_time
+                            
+                            matched_ids.add(buy["id"])
+                            matched_ids.add(sell["id"])
+                            matches_found += 1
+                            
+                            print(f"[MATCH] Partial match (buy): {buy['user']} buys {sell['amount']} ← {sell['user']} sells {sell['amount']} kWh, Remaining buy amount: {remaining_amount} kWh")
+                            break  # Found a partial match for this buy order, move to next buy order
+                            
+                        # Case 3: Sell amount > Buy amount - Complete match for buy, partial match for sell
+                        elif sell["amount"] > buy["amount"]:
+                            # Create complete match for buy order
+                            buy["status"] = "matched"
+                            buy["matched_with"] = sell["id"]
+                            buy["match_time"] = match_time
+                            
+                            # Create partial match for sell order
+                            sell["status"] = "partially_matched"
+                            
+                            # Create new sell order for remaining amount
+                            remaining_amount = sell["amount"] - buy["amount"]
+                            new_sell_order = sell.copy()
+                            new_sell_order["id"] = None  # Will be generated when saved
+                            new_sell_order["status"] = "open"
+                            new_sell_order["amount"] = remaining_amount
+                            new_sell_order["original_order_id"] = sell["id"]
+                            new_orders.append(new_sell_order)
+                            
+                            # Update original sell order to reflect matched portion
+                            sell["amount"] = buy["amount"]
+                            sell["matched_with"] = buy["id"]
+                            sell["match_time"] = match_time
+                            
+                            matched_ids.add(buy["id"])
+                            matched_ids.add(sell["id"])
+                            matches_found += 1
+                            
+                            print(f"[MATCH] Partial match (sell): {buy['user']} buys {buy['amount']} ← {sell['user']} sells {buy['amount']} kWh, Remaining sell amount: {remaining_amount} kWh")
+                            break  # Found a match for this buy order, move to next buy order
+            
+            # Add new orders created from partial matches
+            for new_order in new_orders:
+                if new_order["id"] is None:
+                    new_order["id"] = len(orders) + 1
+                    orders.append(new_order)
+                    print(f"[DB] Created new order: User {new_order['user']} {new_order['type']} {new_order['amount']} kWh at ${new_order['price']}")
 
             print(f"[DB] Found {matches_found} matching orders")
-            if matches_found > 0:
+            if matches_found > 0 or len(new_orders) > 0:
                 with open(ORDERS_FILE, "w") as f:
                     json.dump(orders, f, indent=2)
-                print(f"[DB] Updated order statuses saved")
+                print(f"[DB] Updated order statuses and created {len(new_orders)} new orders")
             return matches_found
         except Exception as e:
             print(f"[DB] Error matching orders: {e}")
@@ -139,7 +218,7 @@ class DatabaseManager:
     def get_matched_orders(self):
         try:
             orders = self.get_all_orders()
-            matched_orders = [o for o in orders if o["status"] == "matched"]
+            matched_orders = [o for o in orders if o["status"] == "matched" or o["status"] == "partially_matched"]
             print(f"[DB] Found {len(matched_orders)} matched orders")
             return matched_orders
         except Exception as e:
