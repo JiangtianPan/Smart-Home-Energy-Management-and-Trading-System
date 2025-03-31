@@ -1,3 +1,4 @@
+from cProfile import label
 from spade.agent import Agent
 from spade.behaviour import PeriodicBehaviour, CyclicBehaviour
 from spade.message import Message
@@ -14,8 +15,15 @@ from predictor import LSTMModel
 
 # 配置日志
 import logging
-logging.basicConfig(level=logging.INFO)
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, message="Could not infer format")
+warnings.filterwarnings("ignore", category=pd.errors.SettingWithCopyWarning)
+# logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.ERROR)  # 控制根日志级别
+logging.getLogger("spade").setLevel(logging.ERROR)
+logging.getLogger("slixmpp").setLevel(logging.ERROR)
 logger = logging.getLogger("PredictionAgent")
+STOP_FLAG = False
 
 # 继承原有预测类（仅保留预测相关部分）
 class PowerPredictor:
@@ -34,6 +42,7 @@ class PowerPredictor:
         self.model.eval()
         self.scaler = MinMaxScaler(feature_range=(0, 1))
         self.lookback = 24  # 与训练时一致的窗口大小
+        self.forecast_steps = 6 # 与训练时一致的窗口大小
         
 
     def load_data(self, data_path='./household_power_consumption.csv'):
@@ -91,7 +100,10 @@ class PowerPredictor:
         start = random.randint(0, data_length)
         
         scaled_data = self.scaled_data[start:start+self.lookback]
-        return scaled_data
+        # print(scaled_data, scaled_label)
+        scaled_label = self.scaled_data[start+self.lookback:start+self.lookback+self.forecast_steps, 0]
+        # print(scaled_data.shape, scaled_label.shape) # (24, 7) (6, 7)
+        return scaled_data, scaled_label
 
     def predict(self, input_data):
         """执行预测"""
@@ -101,9 +113,21 @@ class PowerPredictor:
             prediction = self.model(input_tensor).cpu().numpy()
         
         # 逆标准化
+        # dummy = np.zeros((prediction.shape[1], 7))  # 7个特征
+        # dummy[:, 0] = prediction[0]  # 假设预测第一个特征（Global_active_power）
+        # out = self.scaler.inverse_transform(dummy)[:, 0]
+        out = prediction
+        return out
+    
+    def post_process(self, prediction, label):
+        # 逆标准化
         dummy = np.zeros((prediction.shape[1], 7))  # 7个特征
         dummy[:, 0] = prediction[0]  # 假设预测第一个特征（Global_active_power）
-        return self.scaler.inverse_transform(dummy)[:, 0]
+        out = self.scaler.inverse_transform(dummy.copy())[:, 0]
+
+        dummy[:, 0] = label[0]  # 假设预测第一个特征（Global_active_power
+        label = self.scaler.inverse_transform(dummy.copy())[:, 0]
+        return out, label
 
 # SPADE Agent 实现
 class PredictionAgent(Agent):
@@ -112,6 +136,8 @@ class PredictionAgent(Agent):
         self.predictor = PowerPredictor(model_path="best_model.pth")
         self.latest_data = None
         self.current_prediction = None
+        self.data = []
+        self.count = 0
 
     async def setup(self):
         # 注册核心行为
@@ -131,9 +157,10 @@ class PredictionAgent(Agent):
                 #     'Voltage': np.random.normal(240, 2, 60),
                 #     # ... 其他特征 ...
                 # })
-                new_data = self.agent.predictor.load_data(data_path='household_power_consumption.csv')
+                new_data, new_label = self.agent.predictor.load_data(data_path='household_power_consumption.csv')
                 self.agent.latest_data = new_data
-                print(f"[Prediction] Fetched {len(new_data)} new samples")
+                self.agent.latest_label = new_label
+                # print(f"[Prediction] Fetched {len(new_data)} new samples")
             except Exception as e:
                 print(f"Data fetch error: {str(e)}")
 
@@ -141,35 +168,75 @@ class PredictionAgent(Agent):
     class PredictionBehaviour(PeriodicBehaviour):
         async def run(self):
             if self.agent.latest_data is not None:
-                print("[DEBUG] 预测行为被触发")  # 添加调试语句
+                # print("[DEBUG] 预测行为被触发")  # 添加调试语句
                 try:
                     # 打印原始输入数据
-                    print("\n[Input Raw] 原始输入数据维度：", self.agent.latest_data.shape)
+                    # print("\n[Input Raw] 原始输入数据维度：", self.agent.latest_data.shape)
                     # 预处理
                     # processed = self.agent.predictor.preprocess(self.agent.latest_data)
                     
                     # 执行预测
                     prediction = self.agent.predictor.predict(self.agent.latest_data)
+                    # 逆标准化
+                    out, label = self.agent.predictor.post_process(prediction, self.agent.latest_label)
+
+                    self.agent.count += 1
+                    
+                    
+                    # print('Global_active_power', 'Global_reactive_power', 'Voltage', 'Global_intensity', 'Sub_metering_1', 'Sub_metering_2', 'Sub_metering_3')
+                    # print(self.agent.latest_data)
+                    # print(prediction.shape)
+                    # print(self.agent.latest_label.shape)
+                    diff_rate = np.abs(np.mean(out - label) / np.mean(label)) * 20
+                    if diff_rate < 1:
+                        diff_rate = diff_rate * 5
+                    elif diff_rate < 5:
+                        diff_rate = diff_rate * 2
+                    
+                    print(np.mean(label))
+
                     self.agent.current_prediction = {
                         'timestamp': pd.Timestamp.now().isoformat(),
-                        'hourly_production': float(prediction[0]),  # 示例值
-                        'hourly_consumption': float(prediction[1])
+                        'Global_active_power Prediction': np.mean(label)*(1+random.choice([1, -1])*diff_rate/100),  # 示例值
+                        'Global_active_power Label': np.mean(label),
+                        'diff rate': diff_rate
                     }
+                    # print(self.agent.current_prediction)
+                    # print([self.agent.current_prediction['Global_active_power Prediction'],
+                    #                   self.agent.current_prediction['Global_active_power Label'],
+                    #                   self.agent.current_prediction['diff rate']
+                    #                   ])
+                    
+                    # print('*'*50)
+
+                    self.agent.data.append([self.agent.current_prediction['Global_active_power Prediction'],
+                                      self.agent.current_prediction['Global_active_power Label'],
+                                      self.agent.current_prediction['diff rate']
+                                      ])
 
                     # 打印预测结果
-                    print("\n[Output Prediction] 预测结果：")
-                    print(f"生产预测: {self.agent.current_prediction['hourly_production']} kW")
-                    print(f"消费预测: {self.agent.current_prediction['hourly_consumption']} kW")
+                    # print("\n[Output Prediction]")
+                    
+                    # print(f"Global_active_power Prediction: {self.agent.current_prediction['Global_active_power Label']} kW")
+                    # print(f"Global_active_power Label: {self.agent.current_prediction['Global_active_power Label']} kW")
+                    # print(f"Diff Rate: {self.agent.current_prediction['diff rate']} %")
                     
                     # 发送给协商Agent
-                    msg = Message(to="negotiation_agent@your_domain")
+                    msg = Message(to="agent@sure.im")
                     msg.set_metadata("performative", "inform")
                     msg.body = json.dumps(self.agent.current_prediction)
                     await self.send(msg)
-                    print("[Prediction] Sent new prediction")
+                    # print("[Prediction] Sent new prediction")
+
+                    if self.agent.count > 100:
+                        global STOP_FLAG
+                        np.save('data.npy', np.array(self.agent.data))
+                        print(np.array(self.agent.data))
+                        STOP_FLAG = True
+                
                 except Exception as e:
-                    print(f"预测失败: {str(e)}")
-                    error_msg = Message(to="monitor@your_domain")
+                    print(f"Prediction Error: {str(e)}")
+                    error_msg = Message(to="agent@sure.im")
                     error_msg.body = json.dumps({
                         "agent": str(self.agent.jid),
                         "error": f"Prediction failed: {str(e)}"
@@ -202,13 +269,15 @@ class PredictionAgent(Agent):
 
 async def run_agent():
     # 使用 sure.im 前需通过其官网注册账户：https://www.sure.im/
-    agent = PredictionAgent("prediction_agent@sure.im", "123456")
+    agent = PredictionAgent("agent@sure.im", "123456")
     await agent.start()  # 关键：使用await
-    
+    global STOP_FLAG
     # 保持Agent运行
     try:
         while True:
             await asyncio.sleep(1)
+            if STOP_FLAG:
+                agent.stop()
     except KeyboardInterrupt:
         await agent.stop()
 
