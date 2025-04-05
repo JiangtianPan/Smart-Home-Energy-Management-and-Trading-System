@@ -57,7 +57,7 @@ class BlockchainClient {
         }
     }
     
-    // Fulfill (buy) an energy trade
+    // Fulfill an energy trade
     async fulfillEnergyTrade(tradeId) {
         try {
             const account = await this.getAccount();
