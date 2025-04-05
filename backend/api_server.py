@@ -341,6 +341,11 @@ def index():
         print(traceback.format_exc())
         return f"Error: {str(e)}", 500
 
+@app.route('/<path:filename>')
+def serve_static_files(filename):
+    frontend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'frontend'))
+    return send_from_directory(frontend_path, filename)
+
 # Health check endpoint
 @app.route("/health", methods=["GET"])
 def health_check():

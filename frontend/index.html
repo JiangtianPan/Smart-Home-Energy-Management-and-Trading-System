@@ -97,6 +97,9 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="my-orders-tab" data-bs-toggle="tab" data-bs-target="#my-orders" type="button" role="tab" aria-selected="false">My Orders</button>
                 </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="blockchain-tab" data-bs-toggle="tab" data-bs-target="#blockchain" type="button" role="tab" aria-selected="false">Blockchain</button>
+                </li>
             </ul>
             
             <div class="tab-content" id="myTabContent">
@@ -227,42 +230,140 @@
                         </div>
                     </div>
                 </div>
+                
+                <div class="tab-pane fade" id="blockchain" role="tabpanel">
+                    <!-- Blockchain Connection Status -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Blockchain Connection</h5>
+                            <span id="blockchainStatusBadge" class="badge bg-secondary">Checking...</span>
+                        </div>
+                        <div class="card-body">
+                            <div id="blockchainStatus">
+                                <p>Connecting to blockchain...</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Energy Trade via Blockchain -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h5>Record Trade on Blockchain</h5>
+                        </div>
+                        <div class="card-body">
+                            <form id="blockchainTradeForm">
+                                <div class="mb-3">
+                                    <label for="bcTradeType" class="form-label">Type:</label>
+                                    <select class="form-select" id="bcTradeType" required>
+                                        <option value="sell">Sell Energy</option>
+                                        <option value="buy">Buy Energy</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bcAmount" class="form-label">Amount (kWh):</label>
+                                    <input type="number" class="form-control" id="bcAmount" min="0.1" step="0.1" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="bcPrice" class="form-label">Price ($):</label>
+                                    <input type="number" class="form-control" id="bcPrice" min="0.01" step="0.01" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Submit to Blockchain</button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                    <!-- Blockchain Transactions -->
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Blockchain Transactions</h5>
+                            <button class="btn btn-sm btn-outline-secondary" id="refreshBlockchainTx">Refresh</button>
+                        </div>
+                        <div class="card-body">
+                            <div id="blockchainTransactions" class="list-group">
+                                <!-- Transactions will be populated here -->
+                                <p class="text-center text-muted">No transactions yet</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="txDetailsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Transaction Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="txDetails">
+                        <!-- Transaction details will be populated here -->
+                    </div>
+                    <div class="progress mt-3">
+                        <div id="txConfirmationProgress" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                    </div>
+                    <p class="text-center mt-2 mb-0">
+                        <small id="txConfirmationText">Waiting for confirmation...</small>
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <a id="viewOnExplorer" href="#" target="_blank" class="btn btn-sm btn-outline-primary">View on Explorer</a>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="blockchain-demo.js"></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Check if user is already logged in
             checkLoginStatus();
-            
+    
             // Login form submission
             document.getElementById('loginForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 login();
             });
-            
+    
             // Logout button
             document.getElementById('logoutButton').addEventListener('click', function() {
                 logout();
             });
-            
+    
             // Order form submission
             document.getElementById('orderForm').addEventListener('submit', function(e) {
                 e.preventDefault();
                 submitOrder();
             });
-            
+    
             // Refresh buttons
-            document.getElementById('refreshOrders').addEventListener('click', loadOrders);
-            document.getElementById('refreshHistory').addEventListener('click', loadHistory);
-            document.getElementById('refreshMyOrders').addEventListener('click', loadMyOrders);
-            
-            // Tab switching
-            document.getElementById('history-tab').addEventListener('click', loadHistory);
-            document.getElementById('my-orders-tab').addEventListener('click', loadMyOrders);
+        document.getElementById('refreshOrders').addEventListener('click', loadOrders);
+        document.getElementById('refreshHistory').addEventListener('click', loadHistory);
+        document.getElementById('refreshMyOrders').addEventListener('click', loadMyOrders);
+    
+        // Tab switching
+        document.getElementById('history-tab').addEventListener('click', loadHistory);
+        document.getElementById('my-orders-tab').addEventListener('click', loadMyOrders);
+    
+        // Blockchain trade form submission
+        document.getElementById('blockchainTradeForm').addEventListener('submit', function(e) {
+            e.preventDefault(); // 阻止默认提交
+        
+            // 直接调用区块链演示的提交函数
+            if (window.submitBlockchainTrade) {
+                window.submitBlockchainTrade();
+            } else {
+                console.error('submitBlockchainTrade function not found');
+            }
         });
+    window.initBlockchain();
+    });
         
         // Check if user is logged in
         function checkLoginStatus() {
