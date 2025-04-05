@@ -63,18 +63,51 @@
   {
     "user": "user1",
     "type": "buy",
-    "amount": 5,
+    "amount": 4,
     "price": 1,
-    "status": "open",
-    "id": 7
+    "status": "partially_matched",
+    "id": 7,
+    "matched_with": 8,
+    "match_time": "2025-03-31 05:39:09"
   },
   {
     "user": "user3",
     "type": "sell",
     "amount": 4,
     "price": 1,
-    "status": "open",
+    "status": "matched",
     "id": 8,
-    "original_order_id": 6
+    "original_order_id": 6,
+    "matched_with": 7,
+    "match_time": "2025-03-31 05:39:09"
+  },
+  {
+    "type": "sell",
+    "amount": 10,
+    "price": 2,
+    "user": "user1",
+    "status": "partially_matched",
+    "id": 9,
+    "matched_with": 10,
+    "match_time": "2025-03-31 05:53:09"
+  },
+  {
+    "type": "buy",
+    "amount": 10,
+    "price": 2,
+    "user": "user2",
+    "status": "matched",
+    "id": 10,
+    "matched_with": 9,
+    "match_time": "2025-03-31 05:53:09"
+  },
+  {
+    "type": "sell",
+    "amount": 10,
+    "price": 2,
+    "user": "user1",
+    "status": "open",
+    "id": 11,
+    "original_order_id": 9
   }
 ]
