@@ -1,6 +1,3 @@
-// blockchain-api.js
-// Express routes for blockchain integration
-
 const express = require('express');
 const router = express.Router();
 const BlockchainClient = require('./blockchain-client');
