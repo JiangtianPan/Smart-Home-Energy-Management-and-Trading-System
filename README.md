@@ -17,6 +17,9 @@
 - LSTM Model: predictor.py
 - LSTM Model Visualization: model_visualization.py
 - Agent Part
-  - Main code file: prediction_agent.py
+  - Prediction Agent file: prediction_agent.py
   - UI part: prediction_UI.py
   - Agent framework testing part: agent_test.py
+
+## Prediction Agent Visualization
+- streamlit run prediction_UI.py
