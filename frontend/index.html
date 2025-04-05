@@ -355,7 +355,6 @@
         document.getElementById('blockchainTradeForm').addEventListener('submit', function(e) {
             e.preventDefault(); // 阻止默认提交
         
-            // 直接调用区块链演示的提交函数
             if (window.submitBlockchainTrade) {
                 window.submitBlockchainTrade();
             } else {
