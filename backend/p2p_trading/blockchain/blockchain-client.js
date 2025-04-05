@@ -1,7 +1,3 @@
-// blockchain-client.js
-// This file handles the interaction with the blockchain
-
-// Load required libraries
 const Web3 = require('web3');
 const contractABI = require('./contractABI.json'); // We'll create this file next
 
