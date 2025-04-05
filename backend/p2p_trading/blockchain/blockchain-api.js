@@ -52,7 +52,7 @@ router.post('/trades', async (req, res) => {
     }
 });
 
-// Fulfill (buy) a trade
+// Fulfill a trade
 router.post('/trades/:id/fulfill', async (req, res) => {
     try {
         const tradeId = req.params.id;
